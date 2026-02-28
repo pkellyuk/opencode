@@ -27,7 +27,7 @@ Related GitHub Issues:
 
 **Usage:**
 ```bash
-cd /c/Users/paulj/dev/opencode
+cd /c/path/to/opencode
 bun run packages/opencode/test/console-mode-stress-test.ts
 ```
 
@@ -66,7 +66,7 @@ stdin flags:
 
 **Usage:**
 ```bash
-cd /c/Users/paulj/dev/opencode
+cd /c/path/to/opencode
 node packages/opencode/test/console-mode-stress-test-simple.js
 ```
 
