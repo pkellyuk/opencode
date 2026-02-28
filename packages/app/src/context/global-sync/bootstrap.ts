@@ -31,6 +31,8 @@ type GlobalStore = {
   reload: undefined | "pending" | "complete"
 }
 
+const GLOBAL_HEALTH_TIMEOUT_MS = 5000
+
 export async function bootstrapGlobal(input: {
   globalSDK: OpencodeClient
   connectErrorTitle: string
@@ -41,10 +43,13 @@ export async function bootstrapGlobal(input: {
   formatMoreCount: (count: number) => string
   setGlobalStore: SetStoreFunction<GlobalStore>
 }) {
-  const health = await input.globalSDK.global
-    .health()
-    .then((x) => x.data)
-    .catch(() => undefined)
+  const health = await Promise.race([
+    input.globalSDK.global
+      .health()
+      .then((x) => x.data)
+      .catch(() => undefined),
+    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), GLOBAL_HEALTH_TIMEOUT_MS)),
+  ])
   if (!health?.healthy) {
     showToast({
       variant: "error",

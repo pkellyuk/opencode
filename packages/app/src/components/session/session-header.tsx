@@ -389,6 +389,15 @@ export function SessionHeader() {
         {(mount) => (
           <Portal mount={mount()}>
             <div class="flex items-center gap-2">
+              <IconButton
+                icon="menu"
+                variant="ghost"
+                class="md:hidden size-8 rounded-md border border-border-weak-base bg-surface-panel text-icon-strong"
+                onClick={layout.mobileSidebar.toggle}
+                aria-label={language.t("sidebar.menu.toggle")}
+                aria-expanded={layout.mobileSidebar.opened()}
+                data-sidebar-toggle="true"
+              />
               <StatusPopover />
               <Show when={projectDirectory()}>
                 <div class="hidden xl:flex items-center">

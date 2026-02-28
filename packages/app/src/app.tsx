@@ -134,7 +134,18 @@ export function AppBaseProviders(props: ParentProps) {
 function ServerKey(props: ParentProps) {
   const server = useServer()
   return (
-    <Show when={server.key} keyed>
+    <Show
+      when={server.key}
+      keyed
+      fallback={
+        <div
+          data-component="server-key-missing"
+          class="size-full flex items-center justify-center text-12-regular text-text-strong p-4"
+        >
+          {`Server unavailable (key: ${String(server.key)})`}
+        </div>
+      }
+    >
       {props.children}
     </Show>
   )

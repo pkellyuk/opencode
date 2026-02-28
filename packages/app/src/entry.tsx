@@ -38,19 +38,30 @@ const getStorage = (key: string) => {
 }
 
 const setStorage = (key: string, value: string | null) => {
-  if (typeof localStorage === "undefined") return
-  try {
-    if (value !== null) {
-      localStorage.setItem(key, value)
-      return
-    }
-    localStorage.removeItem(key)
-  } catch {
-    return
+  if (typeof localStorage !== "undefined") {
+    try {
+      if (value !== null) {
+        localStorage.setItem(key, value)
+      } else {
+        localStorage.removeItem(key)
+      }
+    } catch {}
   }
+
+  if (key !== DEFAULT_SERVER_URL_KEY) return
+
+  try {
+    const android = (globalThis as any).Android
+    if (!android || typeof android.setDefaultServer !== "function") return
+    android.setDefaultServer(value)
+  } catch {}
 }
 
-const readDefaultServerUrl = () => getStorage(DEFAULT_SERVER_URL_KEY)
+const readDefaultServerUrl = () => {
+  const override = (globalThis as any).__OPENCODE_DEFAULT_SERVER__
+  if (typeof override === "string" && override.length > 0) return override
+  return getStorage(DEFAULT_SERVER_URL_KEY)
+}
 const writeDefaultServerUrl = (url: string | null) => setStorage(DEFAULT_SERVER_URL_KEY, url)
 
 const notify: Platform["notify"] = async (title, description, href) => {
@@ -113,10 +124,10 @@ const platform: Platform = {
 const defaultUrl = iife(() => {
   const lsDefault = readDefaultServerUrl()
   if (lsDefault) return lsDefault
-  if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
+  if (location.hostname.includes("opencode.ai")) return "http://10.0.2.2:4096"
   if (import.meta.env.DEV)
-    return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
-  return location.origin
+    return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "10.0.2.2"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
+  return "http://10.0.2.2:4096"
 })
 
 if (root instanceof HTMLElement) {

@@ -376,6 +376,16 @@ export function GlobalSyncProvider(props: ParentProps) {
       <Match when={value.ready}>
         <GlobalSyncContext.Provider value={value}>{props.children}</GlobalSyncContext.Provider>
       </Match>
+      <Match when={true}>
+        <GlobalSyncContext.Provider value={value}>
+          <div
+            data-component="global-sync-loading"
+            class="size-full flex items-center justify-center text-12-regular text-text-weak"
+          >
+            Connecting to server...
+          </div>
+        </GlobalSyncContext.Provider>
+      </Match>
     </Switch>
   )
 }

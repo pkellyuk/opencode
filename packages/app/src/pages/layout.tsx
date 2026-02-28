@@ -112,6 +112,7 @@ export default function Layout(props: ParentProps) {
   const command = useCommand()
   const theme = useTheme()
   const language = useLanguage()
+  const isAndroid = () => typeof navigator === "object" && /Android/i.test(navigator.userAgent ?? "")
   const initialDirectory = decode64(params.dir)
   const availableThemeEntries = createMemo(() => Object.entries(theme.themes()))
   const colorSchemeOrder: ColorScheme[] = ["system", "light", "dark"]
@@ -159,7 +160,8 @@ export default function Layout(props: ParentProps) {
   )
 
   const aim = createAim({
-    enabled: () => !layout.sidebar.opened(),
+    // Hover-driven sidebar preview is desktop-only; it causes sticky panels on Android touch devices.
+    enabled: () => !isAndroid() && !layout.sidebar.opened(),
     active: () => state.hoverProject,
     el: () => state.nav,
     onActivate: (directory) => {
@@ -176,7 +178,42 @@ export default function Layout(props: ParentProps) {
     aim.reset()
   })
 
-  const sidebarHovering = createMemo(() => !layout.sidebar.opened() && state.hoverProject !== undefined)
+  onMount(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!layout.mobileSidebar.opened()) return
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('[data-sidebar-toggle="true"]')) return
+      if (target.closest('[data-component="sidebar-nav-mobile"]')) return
+      layout.mobileSidebar.hide()
+    }
+
+    document.addEventListener("pointerdown", onPointerDown, true)
+    onCleanup(() => {
+      document.removeEventListener("pointerdown", onPointerDown, true)
+    })
+  })
+
+  let forced = false
+  createEffect(() => {
+    if (!isAndroid()) return
+    if (forced) return
+    if (!layoutReady()) return
+    if (!layout.sidebar.opened()) {
+      forced = true
+      return
+    }
+    queueMicrotask(() => {
+      layout.sidebar.close()
+      forced = true
+    })
+  })
+
+  const sidebarHovering = createMemo(() => !isAndroid() && !layout.sidebar.opened() && state.hoverProject !== undefined)
+  const androidHideSidebar = createMemo(
+    () => isAndroid() && !layout.sidebar.opened() && !layout.mobileSidebar.opened(),
+  )
+  const desktopSidebarHidden = createMemo(() => isAndroid() || androidHideSidebar())
   const sidebarExpanded = createMemo(() => layout.sidebar.opened() || sidebarHovering())
   const setHoverProject = (value: string | undefined) => {
     setState("hoverProject", value)
@@ -187,6 +224,7 @@ export default function Layout(props: ParentProps) {
   const setHoverSession = (id: string | undefined) => setState("hoverSession", id)
 
   const hoverProjectData = createMemo(() => {
+    if (isAndroid()) return
     const id = state.hoverProject
     if (!id) return
     return layout.projects.list().find((project) => project.worktree === id)
@@ -232,6 +270,11 @@ export default function Layout(props: ParentProps) {
     clearSidebarHoverState()
     navigate(href)
     layout.mobileSidebar.hide()
+  }
+
+  const navigateToNewSession = (directory: string | undefined) => {
+    if (!directory) return
+    navigateWithSidebarReset(`/${base64Encode(directory)}/session`)
   }
 
   function cycleTheme(direction = 1) {
@@ -1708,7 +1751,10 @@ export default function Layout(props: ParentProps) {
     nav: () => state.nav,
     onProjectMouseEnter: (worktree, event) => aim.enter(worktree, event),
     onProjectMouseLeave: (worktree) => aim.leave(worktree),
-    onProjectFocus: (worktree) => aim.activate(worktree),
+    onProjectFocus: (worktree) => {
+      if (isAndroid()) return
+      aim.activate(worktree)
+    },
     navigateToProject,
     openSidebar: () => layout.sidebar.open(),
     closeProject,
@@ -1761,6 +1807,30 @@ export default function Layout(props: ParentProps) {
         }}
         style={{ width: panelProps.mobile ? undefined : `${Math.max(layout.sidebar.width() - 64, 0)}px` }}
       >
+        <Show when={panelProps.mobile}>
+          <div class="shrink-0 px-2 py-2 flex items-center justify-between border-b border-border-weak-base">
+            <div class="text-12-medium text-text-weak">{language.t("sidebar.menu.toggle")}</div>
+            <IconButton
+              icon="close-small"
+              variant="ghost"
+              class="size-7"
+              onClick={layout.mobileSidebar.hide}
+              aria-label={language.t("common.close")}
+            />
+          </div>
+        </Show>
+        <Show when={!panelProps.mobile && typeof navigator === "object" && /Android/i.test(navigator.userAgent ?? "")}>
+          <div class="shrink-0 px-2 py-2 flex items-center justify-between border-b border-border-weak-base">
+            <div class="text-12-medium text-text-weak">{language.t("sidebar.menu.toggle")}</div>
+            <IconButton
+              icon="close-small"
+              variant="ghost"
+              class="size-7"
+              onClick={layout.sidebar.close}
+              aria-label={language.t("common.close")}
+            />
+          </div>
+        </Show>
         <Show when={panelProps.project}>
           {(p) => (
             <>
@@ -1861,7 +1931,7 @@ export default function Layout(props: ParentProps) {
                             size="large"
                             icon="plus-small"
                             class="w-full"
-                            onClick={() => navigateWithSidebarReset(`/${base64Encode(p().worktree)}/session`)}
+                            onClick={() => navigateToNewSession(p().worktree)}
                           >
                             {language.t("command.session.new")}
                           </Button>
@@ -1963,16 +2033,38 @@ export default function Layout(props: ParentProps) {
 
   return (
     <div class="relative bg-background-base flex-1 min-h-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text">
+      <Show when={isAndroid()}>
+        <IconButton
+          icon="menu"
+          variant="ghost"
+          class="fixed left-2 top-2 z-[80] size-8 rounded-md border border-border-weak-base bg-surface-panel text-icon-strong"
+          onClick={layout.mobileSidebar.toggle}
+          aria-label={language.t("sidebar.menu.toggle")}
+          aria-expanded={layout.mobileSidebar.opened()}
+          data-sidebar-toggle="true"
+        />
+      </Show>
       <Titlebar />
       <div class="flex-1 min-h-0 flex">
         <nav
           aria-label={language.t("sidebar.nav.projectsAndSessions")}
           data-component="sidebar-nav-desktop"
           classList={{
-            "hidden xl:block": true,
+            "hidden xl:block": !desktopSidebarHidden(),
+            "xl:hidden": desktopSidebarHidden(),
             "relative shrink-0": true,
+            hidden: desktopSidebarHidden(),
+            "overflow-hidden": true,
+            "pointer-events-none": desktopSidebarHidden(),
+            "opacity-0": desktopSidebarHidden(),
           }}
-          style={{ width: layout.sidebar.opened() ? `${Math.max(layout.sidebar.width(), 244)}px` : "64px" }}
+          style={{
+            width: desktopSidebarHidden()
+              ? "0px"
+              : layout.sidebar.opened()
+                ? `${Math.max(layout.sidebar.width(), 244)}px`
+                : "64px",
+          }}
           ref={(el) => {
             setState("nav", el)
           }}
@@ -2018,7 +2110,7 @@ export default function Layout(props: ParentProps) {
               renderPanel={() => <SidebarPanel project={currentProject()} />}
             />
           </div>
-          <Show when={!layout.sidebar.opened() ? hoverProjectData()?.worktree : undefined} keyed>
+          <Show when={!isAndroid() && !layout.sidebar.opened() ? hoverProjectData()?.worktree : undefined} keyed>
             {(worktree) => (
               <div class="absolute inset-y-0 left-16 z-50 flex" onMouseEnter={aim.reset}>
                 <SidebarPanel project={hoverProjectData()} />
@@ -2037,7 +2129,11 @@ export default function Layout(props: ParentProps) {
             />
           </Show>
         </nav>
-        <div class="xl:hidden">
+        <div
+          classList={{
+            "xl:hidden": !isAndroid(),
+          }}
+        >
           <div
             classList={{
               "fixed inset-x-0 top-10 bottom-0 z-40 transition-opacity duration-200": true,
@@ -2047,14 +2143,16 @@ export default function Layout(props: ParentProps) {
             onClick={(e) => {
               if (e.target === e.currentTarget) layout.mobileSidebar.hide()
             }}
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) layout.mobileSidebar.hide()
+            }}
           />
           <nav
             aria-label={language.t("sidebar.nav.projectsAndSessions")}
             data-component="sidebar-nav-mobile"
-            classList={{
-              "@container fixed top-10 bottom-0 left-0 z-50 w-72 bg-background-base transition-transform duration-200 ease-out": true,
-              "translate-x-0": layout.mobileSidebar.opened(),
-              "-translate-x-full": !layout.mobileSidebar.opened(),
+            class="@container fixed top-10 bottom-0 left-0 z-50 w-72 bg-background-base transition-transform duration-200 ease-out"
+            style={{
+              transform: layout.mobileSidebar.opened() ? "translateX(0)" : "translateX(-100%)",
             }}
             onClick={(e) => e.stopPropagation()}
           >

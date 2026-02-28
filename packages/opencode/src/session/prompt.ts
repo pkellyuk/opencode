@@ -315,10 +315,15 @@ export namespace SessionPrompt {
       }
 
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+      const assistantFinishedLatestTurn =
+        lastAssistant?.parentID === lastUser.id ||
+        (!!lastAssistant?.time?.created &&
+          !!lastUser?.time?.created &&
+          lastAssistant.time.created >= lastUser.time.created)
       if (
         lastAssistant?.finish &&
         !["tool-calls", "unknown"].includes(lastAssistant.finish) &&
-        lastUser.id < lastAssistant.id
+        assistantFinishedLatestTurn
       ) {
         log.info("exiting loop", { sessionID })
         break

@@ -1,5 +1,5 @@
 import { createStore, produce } from "solid-js/store"
-import { batch, createEffect, createMemo, onCleanup, onMount, type Accessor } from "solid-js"
+import { batch, createEffect, createMemo, createSignal, onCleanup, onMount, type Accessor } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { useGlobalSync } from "./global-sync"
 import { useGlobalSDK } from "./global-sdk"
@@ -193,6 +193,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       }),
     )
 
+    const android = typeof navigator === "object" && /Android/i.test(navigator.userAgent ?? "")
+    const [drawer, setDrawer] = createSignal(false)
     const MAX_SESSION_KEYS = 50
     const PENDING_MESSAGE_TTL_MS = 2 * 60 * 1000
     const usage = {
@@ -609,14 +611,26 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
       },
       mobileSidebar: {
-        opened: createMemo(() => store.mobileSidebar?.opened ?? false),
+        opened: createMemo(() => (android ? drawer() : store.mobileSidebar?.opened ?? false)),
         show() {
+          if (android) {
+            setDrawer(true)
+            return
+          }
           setStore("mobileSidebar", "opened", true)
         },
         hide() {
+          if (android) {
+            setDrawer(false)
+            return
+          }
           setStore("mobileSidebar", "opened", false)
         },
         toggle() {
+          if (android) {
+            setDrawer((x) => !x)
+            return
+          }
           setStore("mobileSidebar", "opened", (x) => !x)
         },
       },
