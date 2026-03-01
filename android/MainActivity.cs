@@ -12,8 +12,10 @@ namespace OpenCode.Android;
 [Activity(Label = "@string/app_name", MainLauncher = true, Theme = "@style/MainTheme")]
 public class MainActivity : Activity
 {
+    const int FileChooserRequestCode = 0x5142;
     WebView? web;
     WebViewAssetLoader? loader;
+    IValueCallback? pendingFilePathCallback;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -46,7 +48,7 @@ public class MainActivity : Activity
 
         WebView.SetWebContentsDebuggingEnabled(true);
         web.SetWebViewClient(new AssetWebViewClient(loader));
-        web.SetWebChromeClient(new AppChromeClient());
+        web.SetWebChromeClient(new AppChromeClient(this));
         web.AddJavascriptInterface(new AppBridge(this), "Android");
 
         web.ClearCache(true);
@@ -64,6 +66,75 @@ public class MainActivity : Activity
         }
 
         base.OnBackPressed();
+    }
+
+    internal bool LaunchFileChooser(IValueCallback? callback, WebChromeClient.FileChooserParams? fileChooserParams)
+    {
+        if (callback is null) return false;
+
+        // Cancel any stale callback before opening a new picker.
+        pendingFilePathCallback?.OnReceiveValue(null);
+        pendingFilePathCallback = callback;
+
+        var intent = fileChooserParams?.CreateIntent() ?? new Intent(Intent.ActionGetContent);
+        intent.AddCategory(Intent.CategoryOpenable);
+        intent.SetType("*/*");
+
+        try
+        {
+#pragma warning disable CS0618
+            StartActivityForResult(Intent.CreateChooser(intent, "Select file"), FileChooserRequestCode);
+#pragma warning restore CS0618
+            return true;
+        }
+        catch (ActivityNotFoundException ex)
+        {
+            Log.Warn("OpenCodeWebView", $"No activity found to pick files: {ex.Message}");
+            pendingFilePathCallback?.OnReceiveValue(null);
+            pendingFilePathCallback = null;
+            return false;
+        }
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        if (requestCode != FileChooserRequestCode)
+        {
+            base.OnActivityResult(requestCode, resultCode, data);
+            return;
+        }
+
+        var callback = pendingFilePathCallback;
+        pendingFilePathCallback = null;
+        if (callback is null) return;
+
+        global::Android.Net.Uri[]? result = null;
+        try
+        {
+            result = WebChromeClient.FileChooserParams.ParseResult((int)resultCode, data);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("OpenCodeWebView", $"Could not parse file chooser result: {ex.Message}");
+        }
+
+        if (result is null && resultCode == Result.Ok && data?.Data is not null)
+        {
+            result = [data.Data];
+        }
+
+        Java.Lang.Object? value = null;
+        if (result is { Length: > 0 })
+        {
+            var uriClass = Java.Lang.Class.FromType(typeof(global::Android.Net.Uri));
+            value = Java.Lang.Reflect.Array.NewInstance(uriClass, result.Length);
+            for (var i = 0; i < result.Length; i++)
+            {
+                Java.Lang.Reflect.Array.Set(value, i, result[i]);
+            }
+        }
+
+        callback.OnReceiveValue(value);
     }
 }
 
@@ -171,12 +242,17 @@ sealed class AppBridge : Java.Lang.Object
     }
 }
 
-sealed class AppChromeClient : WebChromeClient
+sealed class AppChromeClient(MainActivity activity) : WebChromeClient
 {
     public override bool OnConsoleMessage(ConsoleMessage? consoleMessage)
     {
         if (consoleMessage is null) return base.OnConsoleMessage(consoleMessage);
         Log.Warn("OpenCodeWebView", $"{consoleMessage.Message()} ({consoleMessage.SourceId()}:{consoleMessage.LineNumber()})");
         return base.OnConsoleMessage(consoleMessage);
+    }
+
+    public override bool OnShowFileChooser(WebView? webView, IValueCallback? filePathCallback, FileChooserParams? fileChooserParams)
+    {
+        return activity.LaunchFileChooser(filePathCallback, fileChooserParams);
     }
 }
