@@ -1,4 +1,4 @@
-import { For, createEffect, createMemo, on, onCleanup, Show, type JSX } from "solid-js"
+import { For, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, type JSX } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useNavigate, useParams } from "@solidjs/router"
 import { Button } from "@opencode-ai/ui/button"
@@ -17,6 +17,7 @@ import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
+import { useLayout } from "@/context/layout"
 import { useSettings } from "@/context/settings"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -111,11 +112,14 @@ export function MessageTimeline(props: {
 
   const params = useParams()
   const navigate = useNavigate()
+  const layout = useLayout()
   const sdk = useSDK()
   const sync = useSync()
   const settings = useSettings()
   const dialog = useDialog()
   const language = useLanguage()
+  const android = () => typeof navigator === "object" && /Android/i.test(navigator.userAgent ?? "")
+  const [titlebarMenuVisible, setTitlebarMenuVisible] = createSignal(false)
 
   const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
   const sessionID = createMemo(() => params.id)
@@ -127,6 +131,7 @@ export function MessageTimeline(props: {
   const titleValue = createMemo(() => info()?.title)
   const parentID = createMemo(() => info()?.parentID)
   const showHeader = createMemo(() => !!(titleValue() || parentID()))
+  const showInlineSidebarToggle = createMemo(() => android() && !props.isDesktop && !titlebarMenuVisible())
 
   const [title, setTitle] = createStore({
     draft: "",
@@ -306,6 +311,49 @@ export function MessageTimeline(props: {
     navigate(`/${params.dir}/session/${id}`)
   }
 
+  const toggleSidebar = () => {
+    if (typeof window === "object" && window.matchMedia("(min-width: 1280px)").matches) {
+      layout.sidebar.toggle()
+      return
+    }
+    layout.mobileSidebar.toggle()
+  }
+
+  const updateTitlebarMenuVisibility = () => {
+    if (typeof document !== "object") return
+    const button = document.querySelector("[data-titlebar-sidebar-toggle='true']")
+    if (!(button instanceof HTMLElement)) {
+      setTitlebarMenuVisible(false)
+      return
+    }
+
+    const style = window.getComputedStyle(button)
+    const rect = button.getBoundingClientRect()
+    const visible =
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      style.opacity !== "0" &&
+      rect.width > 0 &&
+      rect.height > 0
+    setTitlebarMenuVisible(visible)
+  }
+
+  onMount(() => {
+    updateTitlebarMenuVisibility()
+    window.addEventListener("resize", updateTitlebarMenuVisibility)
+    const observer = new MutationObserver(updateTitlebarMenuVisibility)
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    })
+    onCleanup(() => {
+      observer.disconnect()
+      window.removeEventListener("resize", updateTitlebarMenuVisibility)
+    })
+  })
+
   function DialogDeleteSession(props: { sessionID: string }) {
     const name = createMemo(() => sync.session.get(props.sessionID)?.title ?? language.t("command.session.new"))
     const handleDelete = async () => {
@@ -418,6 +466,17 @@ export function MessageTimeline(props: {
             >
               <div class="h-12 w-full flex items-center justify-between gap-2">
                 <div class="flex items-center gap-1 min-w-0 flex-1 pr-3">
+                  <Show when={showInlineSidebarToggle()}>
+                    <IconButton
+                      icon="menu"
+                      variant="ghost"
+                      class="titlebar-icon rounded-md"
+                      data-sidebar-toggle="true"
+                      onClick={toggleSidebar}
+                      aria-label={language.t("sidebar.menu.toggle")}
+                      aria-expanded={layout.mobileSidebar.opened()}
+                    />
+                  </Show>
                   <Show when={parentID()}>
                     <IconButton
                       tabIndex={-1}

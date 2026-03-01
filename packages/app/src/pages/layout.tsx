@@ -2033,17 +2033,6 @@ export default function Layout(props: ParentProps) {
 
   return (
     <div class="relative bg-background-base flex-1 min-h-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text">
-      <Show when={isAndroid()}>
-        <IconButton
-          icon="menu"
-          variant="ghost"
-          class="fixed left-2 top-2 z-[80] size-8 rounded-md border border-border-weak-base bg-surface-panel text-icon-strong"
-          onClick={layout.mobileSidebar.toggle}
-          aria-label={language.t("sidebar.menu.toggle")}
-          aria-expanded={layout.mobileSidebar.opened()}
-          data-sidebar-toggle="true"
-        />
-      </Show>
       <Titlebar />
       <div class="flex-1 min-h-0 flex">
         <nav

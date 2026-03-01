@@ -11,6 +11,13 @@ function sortParts(parts: Part[]) {
   return parts.filter((part) => !!part?.id).sort((a, b) => cmp(a.id, b.id))
 }
 
+function cmpMessage(a: Message, b: Message) {
+  const at = a.time?.created ?? 0
+  const bt = b.time?.created ?? 0
+  if (at !== bt) return at - bt
+  return cmp(a.id, b.id)
+}
+
 function runInflight(map: Map<string, Promise<void>>, key: string, task: () => Promise<void>) {
   const pending = map.get(key)
   if (pending) return pending
@@ -47,8 +54,10 @@ export function applyOptimisticAdd(draft: OptimisticStore, input: OptimisticAddI
     draft.message[input.sessionID] = [input.message]
   }
   if (messages) {
-    const result = Binary.search(messages, input.message.id, (m) => m.id)
-    messages.splice(result.index, 0, input.message)
+    const index = messages.findIndex((message) => message.id === input.message.id)
+    if (index >= 0) messages[index] = input.message
+    else messages.push(input.message)
+    messages.sort(cmpMessage)
   }
   draft.part[input.message.id] = sortParts(input.parts)
 }
@@ -56,8 +65,8 @@ export function applyOptimisticAdd(draft: OptimisticStore, input: OptimisticAddI
 export function applyOptimisticRemove(draft: OptimisticStore, input: OptimisticRemoveInput) {
   const messages = draft.message[input.sessionID]
   if (messages) {
-    const result = Binary.search(messages, input.messageID, (m) => m.id)
-    if (result.found) messages.splice(result.index, 1)
+    const index = messages.findIndex((message) => message.id === input.messageID)
+    if (index >= 0) messages.splice(index, 1)
   }
   delete draft.part[input.messageID]
 }
@@ -65,9 +74,11 @@ export function applyOptimisticRemove(draft: OptimisticStore, input: OptimisticR
 function setOptimisticAdd(setStore: (...args: unknown[]) => void, input: OptimisticAddInput) {
   setStore("message", input.sessionID, (messages: Message[] | undefined) => {
     if (!messages) return [input.message]
-    const result = Binary.search(messages, input.message.id, (m) => m.id)
     const next = [...messages]
-    next.splice(result.index, 0, input.message)
+    const index = next.findIndex((message) => message.id === input.message.id)
+    if (index >= 0) next[index] = input.message
+    else next.push(input.message)
+    next.sort(cmpMessage)
     return next
   })
   setStore("part", input.message.id, sortParts(input.parts))
@@ -76,10 +87,10 @@ function setOptimisticAdd(setStore: (...args: unknown[]) => void, input: Optimis
 function setOptimisticRemove(setStore: (...args: unknown[]) => void, input: OptimisticRemoveInput) {
   setStore("message", input.sessionID, (messages: Message[] | undefined) => {
     if (!messages) return messages
-    const result = Binary.search(messages, input.messageID, (m) => m.id)
-    if (!result.found) return messages
+    const index = messages.findIndex((message) => message.id === input.messageID)
+    if (index < 0) return messages
     const next = [...messages]
-    next.splice(result.index, 1)
+    next.splice(index, 1)
     return next
   })
   setStore("part", (part: Record<string, Part[] | undefined>) => {
@@ -135,7 +146,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       const session = items
         .map((x) => x.info)
         .filter((m) => !!m?.id)
-        .sort((a, b) => cmp(a.id, b.id))
+        .sort(cmpMessage)
       const part = items.map((message) => ({ id: message.info.id, part: sortParts(message.parts) }))
       return {
         session,

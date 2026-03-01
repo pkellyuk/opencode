@@ -2,7 +2,6 @@ import { AssistantMessage, type FileDiff, Message as MessageType, Part as PartTy
 import { useData } from "../context"
 import { useFileComponent } from "../context/file"
 
-import { Binary } from "@opencode-ai/util/binary"
 import { getDirectory, getFilename } from "@opencode-ai/util/path"
 import { createEffect, createMemo, createSignal, For, on, ParentProps, Show } from "solid-js"
 import { Dynamic } from "solid-js/web"
@@ -164,9 +163,7 @@ export function SessionTurn(
 
   const messageIndex = createMemo(() => {
     const messages = allMessages() ?? emptyMessages
-    const result = Binary.search(messages, props.messageID, (m) => m.id)
-
-    const index = result.found ? result.index : messages.findIndex((m) => m.id === props.messageID)
+    const index = messages.findIndex((m) => m.id === props.messageID)
     if (index < 0) return -1
 
     const msg = messages[index]
@@ -239,17 +236,9 @@ export function SessionTurn(
       if (!msg) return emptyAssistant
 
       const messages = allMessages() ?? emptyMessages
-      const index = messageIndex()
-      if (index < 0) return emptyAssistant
-
-      const result: AssistantMessage[] = []
-      for (let i = index + 1; i < messages.length; i++) {
-        const item = messages[i]
-        if (!item) continue
-        if (item.role === "user") break
-        if (item.role === "assistant" && item.parentID === msg.id) result.push(item as AssistantMessage)
-      }
-      return result
+      return messages.filter(
+        (item): item is AssistantMessage => item.role === "assistant" && item.parentID === msg.id,
+      )
     },
     emptyAssistant,
     { equals: same },

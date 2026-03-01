@@ -10,11 +10,10 @@ export type ColorScheme = "light" | "dark" | "system"
 const STORAGE_KEYS = {
   THEME_ID: "opencode-theme-id",
   COLOR_SCHEME: "opencode-color-scheme",
-  THEME_CSS_LIGHT: "opencode-theme-css-light",
-  THEME_CSS_DARK: "opencode-theme-css-dark",
 } as const
 
 const THEME_STYLE_ID = "oc-theme"
+const themeCssStorageKey = (themeId: string, mode: "light" | "dark") => `opencode-theme-css-${themeId}-${mode}`
 
 function ensureThemeStyleElement(): HTMLStyleElement {
   const existing = document.getElementById(THEME_STYLE_ID) as HTMLStyleElement | null
@@ -35,11 +34,9 @@ function applyThemeCss(theme: DesktopTheme, themeId: string, mode: "light" | "da
   const tokens = resolveThemeVariant(variant, isDark)
   const css = themeToCss(tokens)
 
-  if (themeId !== "oc-1") {
-    try {
-      localStorage.setItem(isDark ? STORAGE_KEYS.THEME_CSS_DARK : STORAGE_KEYS.THEME_CSS_LIGHT, css)
-    } catch {}
-  }
+  try {
+    localStorage.setItem(themeCssStorageKey(themeId, mode), css)
+  } catch {}
 
   const fullCss = `:root {
   color-scheme: ${mode};
@@ -54,14 +51,13 @@ function applyThemeCss(theme: DesktopTheme, themeId: string, mode: "light" | "da
 }
 
 function cacheThemeVariants(theme: DesktopTheme, themeId: string) {
-  if (themeId === "oc-1") return
   for (const mode of ["light", "dark"] as const) {
     const isDark = mode === "dark"
     const variant = isDark ? theme.dark : theme.light
     const tokens = resolveThemeVariant(variant, isDark)
     const css = themeToCss(tokens)
     try {
-      localStorage.setItem(isDark ? STORAGE_KEYS.THEME_CSS_DARK : STORAGE_KEYS.THEME_CSS_LIGHT, css)
+      localStorage.setItem(themeCssStorageKey(themeId, mode), css)
     } catch {}
   }
 }

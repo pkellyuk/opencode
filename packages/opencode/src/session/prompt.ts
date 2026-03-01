@@ -735,6 +735,52 @@ export namespace SessionPrompt {
     return Provider.defaultModel()
   }
 
+  async function resolveModelAlias(input: string) {
+    if (!input) return
+    const providers = await Provider.list()
+    const matches = Object.values(providers).filter((provider) => !!provider.models[input])
+    if (matches.length !== 1) return
+    return {
+      providerID: matches[0].id,
+      modelID: input,
+    }
+  }
+
+  async function validateModelRef(input: { providerID: string; modelID: string }) {
+    if (!input.providerID || !input.modelID) return
+    return Provider.getModel(input.providerID, input.modelID)
+      .then(() => input)
+      .catch(() => undefined)
+  }
+
+  async function lastValidModel(sessionID: string) {
+    for await (const item of MessageV2.stream(sessionID)) {
+      if (item.info.role !== "user" || !item.info.model) continue
+      const model = item.info.model
+      const valid = await validateModelRef(model)
+      if (valid) return valid
+      if (!model.modelID && model.providerID) {
+        const alias = await resolveModelAlias(model.providerID)
+        if (alias) return alias
+      }
+    }
+  }
+
+  async function resolvePromptModel(sessionID: string, input: { providerID: string; modelID: string }) {
+    const direct = await validateModelRef(input)
+    if (direct) return direct
+
+    if (!input.modelID && input.providerID) {
+      const alias = await resolveModelAlias(input.providerID)
+      if (alias) return alias
+    }
+
+    const previous = await lastValidModel(sessionID)
+    if (previous) return previous
+
+    return Provider.defaultModel()
+  }
+
   /** @internal Exported for testing */
   export async function resolveTools(input: {
     agent: Agent.Info
@@ -959,7 +1005,7 @@ export namespace SessionPrompt {
   async function createUserMessage(input: PromptInput) {
     const agent = await Agent.get(input.agent ?? (await Agent.defaultAgent()))
 
-    const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
+    const model = await resolvePromptModel(input.sessionID, input.model ?? agent.model ?? (await lastModel(input.sessionID)))
     const full =
       !input.variant && agent.variant
         ? await Provider.getModel(model.providerID, model.modelID).catch(() => undefined)

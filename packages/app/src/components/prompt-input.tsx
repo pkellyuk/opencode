@@ -1353,10 +1353,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       </DockShellForm>
       <Show when={store.mode === "normal" || store.mode === "shell"}>
         <DockTray attach="top">
-          <div class="px-1.75 pt-5.5 pb-2 flex items-center gap-2 min-w-0">
-            <div class="flex items-center gap-1.5 min-w-0 flex-1">
+          <div class="px-1.75 pt-5.5 pb-2 flex flex-wrap items-center gap-2 min-w-0">
+            <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto no-scrollbar pr-1">
               <Show when={store.mode === "shell"}>
-                <div class="h-7 flex items-center gap-1.5 max-w-[160px] min-w-0" style={{ padding: "0 4px 0 8px" }}>
+                <div
+                  class="h-7 flex items-center gap-1.5 max-w-[160px] min-w-0 shrink-0"
+                  style={{ padding: "0 4px 0 8px" }}
+                >
                   <span class="truncate text-13-medium text-text-strong">{language.t("prompt.mode.shell")}</span>
                   <div class="size-4 shrink-0" />
                 </div>
@@ -1373,7 +1376,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     options={agentNames()}
                     current={local.agent.current()?.name ?? ""}
                     onSelect={local.agent.set}
-                    class="capitalize max-w-[160px]"
+                    class="capitalize max-w-[160px] shrink-0"
                     valueClass="truncate text-13-regular"
                     triggerStyle={{ height: "28px" }}
                     variant="ghost"
@@ -1392,7 +1395,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         as="div"
                         variant="ghost"
                         size="normal"
-                        class="min-w-0 max-w-[320px] text-13-regular group"
+                        class="min-w-0 max-w-[320px] text-13-regular group shrink-0"
                         style={{ height: "28px" }}
                         onClick={() => dialog.show(() => <DialogSelectModelUnpaid />)}
                       >
@@ -1423,7 +1426,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         variant: "ghost",
                         size: "normal",
                         style: { height: "28px" },
-                        class: "min-w-0 max-w-[320px] text-13-regular group",
+                        class: "min-w-0 max-w-[320px] text-13-regular group shrink-0",
                       }}
                     >
                       <Show when={local.model.current()?.provider?.id}>
@@ -1452,7 +1455,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     current={local.model.variant.current() ?? "default"}
                     label={(x) => (x === "default" ? language.t("common.default") : x)}
                     onSelect={(x) => local.model.variant.set(x === "default" ? undefined : x)}
-                    class="capitalize max-w-[160px]"
+                    class="capitalize max-w-[160px] shrink-0"
                     valueClass="truncate text-13-regular"
                     triggerStyle={{ height: "28px" }}
                     variant="ghost"
@@ -1487,7 +1490,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 onSelect={(mode) => mode && setMode(mode)}
                 fill
                 pad="none"
-                class="w-[68px]"
+                class="w-[68px] shrink-0"
               />
             </div>
           </div>

@@ -1285,21 +1285,69 @@ export namespace Provider {
     )
   }
 
+  function resolveModelReference(
+    providers: Record<string, Info>,
+    input: {
+      providerID: string
+      modelID: string
+    },
+  ) {
+    const provider = providers[input.providerID]
+    if (provider && input.modelID && provider.models[input.modelID]) {
+      return input
+    }
+
+    // Accept "provider/" or just "provider" and pick the provider's best model.
+    if (provider && !input.modelID) {
+      const [best] = sort(Object.values(provider.models))
+      if (best) {
+        return {
+          providerID: provider.id,
+          modelID: best.id,
+        }
+      }
+    }
+
+    // Recover from malformed config/model strings where only a model id is provided.
+    if (!input.modelID && input.providerID) {
+      const matches = Object.values(providers)
+        .filter((entry) => !!entry.models[input.providerID])
+        .map((entry) => ({
+          providerID: entry.id,
+          modelID: input.providerID,
+        }))
+      if (matches.length === 1) return matches[0]
+    }
+
+    // Recover from swapped "model/provider" ordering.
+    if (input.modelID && !provider) {
+      const swapped = providers[input.modelID]
+      if (swapped && swapped.models[input.providerID]) {
+        return {
+          providerID: swapped.id,
+          modelID: input.providerID,
+        }
+      }
+    }
+  }
+
   export async function defaultModel() {
     const cfg = await Config.get()
-    if (cfg.model) return parseModel(cfg.model)
-
     const providers = await list()
+    if (cfg.model) {
+      const configured = resolveModelReference(providers, parseModel(cfg.model))
+      if (configured) return configured
+    }
+
     const recent = (await Filesystem.readJson<{ recent?: { providerID: string; modelID: string }[] }>(
       path.join(Global.Path.state, "model.json"),
     )
       .then((x) => (Array.isArray(x.recent) ? x.recent : []))
       .catch(() => [])) as { providerID: string; modelID: string }[]
     for (const entry of recent) {
-      const provider = providers[entry.providerID]
-      if (!provider) continue
-      if (!provider.models[entry.modelID]) continue
-      return { providerID: entry.providerID, modelID: entry.modelID }
+      const resolved = resolveModelReference(providers, entry)
+      if (!resolved) continue
+      return resolved
     }
 
     const provider = Object.values(providers).find((p) => !cfg.provider || Object.keys(cfg.provider).includes(p.id))

@@ -48,6 +48,7 @@ export function SessionComposerRegion(props: {
       ref={props.setPromptDockRef}
       data-component="session-prompt-dock"
       class="shrink-0 w-full pb-3 flex flex-col justify-center items-center bg-background-stronger pointer-events-none"
+      style={{ "padding-bottom": "max(env(safe-area-inset-bottom), 0.75rem)" }}
     >
       <div
         classList={{

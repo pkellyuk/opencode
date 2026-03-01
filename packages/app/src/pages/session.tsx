@@ -32,6 +32,13 @@ import { SessionMobileTabs } from "@/pages/session/session-mobile-tabs"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 
+const cmpMessage = (a: { id: string; time: { created: number } }, b: { id: string; time: { created: number } }) => {
+  if (a.time.created !== b.time.created) return a.time.created - b.time.created
+  if (a.id < b.id) return -1
+  if (a.id > b.id) return 1
+  return 0
+}
+
 export default function Page() {
   const layout = useLayout()
   const local = useLocal()
@@ -161,7 +168,11 @@ export default function Page() {
   const reviewCount = createMemo(() => Math.max(info()?.summary?.files ?? 0, diffs().length))
   const hasReview = createMemo(() => reviewCount() > 0)
   const revertMessageID = createMemo(() => info()?.revert?.messageID)
-  const messages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
+  const messages = createMemo(() => {
+    const list = params.id ? (sync.data.message[params.id] ?? []) : []
+    if (list.length < 2) return list
+    return [...list].sort(cmpMessage)
+  })
   const messagesReady = createMemo(() => {
     const id = params.id
     if (!id) return true
@@ -188,7 +199,9 @@ export default function Page() {
     () => {
       const revert = revertMessageID()
       if (!revert) return userMessages()
-      return userMessages().filter((m) => m.id < revert)
+      const index = userMessages().findIndex((m) => m.id === revert)
+      if (index < 0) return userMessages()
+      return userMessages().slice(0, index)
     },
     emptyUserMessages,
     {
@@ -314,9 +327,8 @@ export default function Page() {
     on(
       () => visibleUserMessages().at(-1)?.id,
       (lastId, prevLastId) => {
-        if (lastId && prevLastId && lastId > prevLastId) {
-          setStore("messageId", undefined)
-        }
+        if (!lastId || !prevLastId || lastId === prevLastId) return
+        setStore("messageId", undefined)
       },
       { defer: true },
     ),

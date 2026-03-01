@@ -14,6 +14,15 @@ import type {
 import type { State, VcsCache } from "./types"
 import { trimSessions } from "./session-trim"
 
+const cmpMessage = (a: Message, b: Message) => {
+  const at = a.time?.created ?? 0
+  const bt = b.time?.created ?? 0
+  if (at !== bt) return at - bt
+  if (a.id < b.id) return -1
+  if (a.id > b.id) return 1
+  return 0
+}
+
 export function applyGlobalEvent(input: {
   event: { type: string; properties?: unknown }
   project: Project[]
@@ -171,18 +180,15 @@ export function applyDirectoryEvent(input: {
         input.setStore("message", info.sessionID, [info])
         break
       }
-      const result = Binary.search(messages, info.id, (m) => m.id)
-      if (result.found) {
-        input.setStore("message", info.sessionID, result.index, reconcile(info))
+      const index = messages.findIndex((message) => message.id === info.id)
+      if (index >= 0) {
+        input.setStore("message", info.sessionID, index, reconcile(info))
         break
       }
-      input.setStore(
-        "message",
-        info.sessionID,
-        produce((draft) => {
-          draft.splice(result.index, 0, info)
-        }),
-      )
+      const next = messages.slice()
+      next.push(info)
+      next.sort(cmpMessage)
+      input.setStore("message", info.sessionID, reconcile(next, { key: "id" }))
       break
     }
     case "message.removed": {
@@ -191,8 +197,8 @@ export function applyDirectoryEvent(input: {
         produce((draft) => {
           const messages = draft.message[props.sessionID]
           if (messages) {
-            const result = Binary.search(messages, props.messageID, (m) => m.id)
-            if (result.found) messages.splice(result.index, 1)
+            const index = messages.findIndex((message) => message.id === props.messageID)
+            if (index >= 0) messages.splice(index, 1)
           }
           delete draft.part[props.messageID]
         }),

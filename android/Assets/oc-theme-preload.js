@@ -9,9 +9,11 @@
   document.documentElement.dataset.theme = themeId
   document.documentElement.dataset.colorScheme = mode
 
-  if (themeId === "oc-1") return
-
   var css = localStorage.getItem("opencode-theme-css-" + themeId + "-" + mode)
+  if (!css) {
+    var legacyKey = mode === "dark" ? "opencode-theme-css-dark" : "opencode-theme-css-light"
+    css = localStorage.getItem(legacyKey)
+  }
   if (css) {
     var style = document.createElement("style")
     style.id = "oc-theme-preload"

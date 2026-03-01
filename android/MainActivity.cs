@@ -1,12 +1,15 @@
 using Android.Content;
+using Android.Graphics;
+using Android.OS;
 using Android.Util;
+using Android.Views;
 using Android.Webkit;
 using AndroidX.WebKit;
 using Java.Interop;
 
 namespace OpenCode.Android;
 
-[Activity(Label = "@string/app_name", MainLauncher = true, Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+[Activity(Label = "@string/app_name", MainLauncher = true, Theme = "@style/MainTheme")]
 public class MainActivity : Activity
 {
     WebView? web;
@@ -17,6 +20,12 @@ public class MainActivity : Activity
         base.OnCreate(savedInstanceState);
 
         SetContentView(Resource.Layout.activity_main);
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
+        {
+            Window?.SetStatusBarColor(Color.White);
+            var decor = Window?.DecorView;
+            if (decor is not null) decor.SystemUiVisibility = (StatusBarVisibility)SystemUiFlags.LightStatusBar;
+        }
 
         web = FindViewById<WebView>(Resource.Id.webview);
         if (web is null) return;

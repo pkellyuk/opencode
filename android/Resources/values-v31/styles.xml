@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="MainTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+    <item name="android:windowSplashScreenAnimatedIcon">@mipmap/appicon</item>
+    <item name="android:windowSplashScreenBackground">#111113</item>
+    <item name="android:windowSplashScreenIconBackgroundColor">#111113</item>
+  </style>
+</resources>
