@@ -136,7 +136,8 @@ sealed class AppBridge : Java.Lang.Object
 {
     const string PrefName = "opencode";
     const string ServerKey = "default_server_url";
-    const string DefaultServerUrl = "http://192.168.0.200:4096";
+    const string DefaultServerUrl = "http://10.26.120.249:4096";
+    static readonly string[] LegacyServerUrls = ["http://10.0.2.2:4096", "http://192.168.0.200:4096"];
     readonly ISharedPreferences prefs;
 
     public AppBridge(Context context)
@@ -148,7 +149,14 @@ sealed class AppBridge : Java.Lang.Object
     [Export("getDefaultServer")]
     public string? GetDefaultServer()
     {
-        return prefs.GetString(ServerKey, DefaultServerUrl);
+        var saved = prefs.GetString(ServerKey, null)?.Trim();
+        if (string.IsNullOrWhiteSpace(saved)) return DefaultServerUrl;
+        if (Array.IndexOf(LegacyServerUrls, saved) < 0) return saved;
+
+        var editor = prefs.Edit();
+        editor.PutString(ServerKey, DefaultServerUrl);
+        editor.Apply();
+        return DefaultServerUrl;
     }
 
     [JavascriptInterface]
