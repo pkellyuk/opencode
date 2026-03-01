@@ -28,3 +28,26 @@ opencode-dev
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Android local test artifacts
+/.opencode_android_logs/
+/android/phone_logcat_latest.txt
+/android/Assets/wwwroot/
+/after_*.png
+/before_*.png
+/current_*.png
+/fix_*.png
+/live_*.png
+/menu_*.png
+/opencode-logo-*.png
+/opencode_appinfo_icon.png
+/opencode_emulator*.png
+/opencode_splash_try_*.png
+/phone_*.png
+/session_*.png
+/state_*.png
+/toggle_seq_*.png
+/emulator*.png
+/*_zoom.png
+/new_dist_assets.txt
+/nul
